@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mobile Image AR (MindAR)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: black;
+    }
+
+    #container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      z-index: 10;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="container"></div>
+  <div class="hint">Point your camera at the image</div>
+
+  <!-- ✅ ES MODULE (REQUIRED) -->
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js";
+    import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/loaders/GLTFLoader.js";
+    import { MindARThree } from "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js";
+
+    const container = document.querySelector("#container");
+
+    async function startAR() {
+
+      const mindarThree = new MindARThree({
+        container: container,
+        imageTargetSrc: "./targets.mind",
+        maxTrack: 1,
+        uiScanning: true,
+        uiLoading: true,
+      });
+
+      const { renderer, scene, camera } = mindarThree;
+
+      /* Camera video (MindAR handles this correctly on mobile) */
+      container.appendChild(mindarThree.video);
+
+      /* Renderer overlay */
+      renderer.setClearColor(0x000000, 0);
+      container.appendChild(renderer.domElement);
+
+      /* Lights */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(1, 2, 1);
+      scene.add(light);
+
+      /* Image target anchor */
+      const anchor = mindarThree.addAnchor(0);
+
+      /* Load model */
+      const loader = new GLTFLoader();
+      loader.load("./whistle.glb", (gltf) => {
+        gltf.scene.scale.set(1, 1, 1);
+        anchor.group.add(gltf.scene);
+      });
+
+      await mindarThree.start();
+
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+    }
+
+    startAR();
+  </script>
+
+</body>
+</html>
