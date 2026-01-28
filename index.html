@@ -19,11 +19,12 @@
     <a-scene
       mindar-image="imageTargetSrc: targets.mind;"
       vr-mode-ui="enabled: false"
+      xr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
       renderer="colorManagement: true, physicallyCorrectLights"
     >
 
-      <!-- ASSETS MUST BE INSIDE SCENE -->
+      <!-- Assets -->
       <a-assets>
         <a-asset-item id="whistleModel" src="./whistle.glb"></a-asset-item>
       </a-assets>
@@ -31,17 +32,63 @@
       <!-- Camera -->
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <!-- TARGET 0 -->
+      <!-- Image Target -->
       <a-entity mindar-image-target="targetIndex: 0">
+
         <a-gltf-model
+          id="arModel"
           src="#whistleModel"
           position="0 0 0.1"
           scale="0.01 0.01 0.01"
           rotation="0 0 0"
           animation="property: rotation; to: 0 360 0; loop: true; dur: 3000"
         ></a-gltf-model>
-      </a-entity>
 
+      </a-entity>
     </a-scene>
+
+    <!-- PINCH ZOOM SCRIPT -->
+    <script>
+      let modelScale = 0.01;
+      const minScale = 0.005;
+      const maxScale = 0.05;
+
+      const model = document.querySelector("#arModel");
+
+      let startDistance = null;
+
+      function getDistance(touches) {
+        const dx = touches[0].pageX - touches[1].pageX;
+        const dy = touches[0].pageY - touches[1].pageY;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
+      document.addEventListener("touchmove", (e) => {
+        if (e.touches.length === 2 && model) {
+          const currentDistance = getDistance(e.touches);
+
+          if (!startDistance) {
+            startDistance = currentDistance;
+            return;
+          }
+
+          const delta = currentDistance - startDistance;
+          modelScale += delta * 0.00005;
+
+          modelScale = Math.min(maxScale, Math.max(minScale, modelScale));
+
+          model.setAttribute(
+            "scale",
+            `${modelScale} ${modelScale} ${modelScale}`
+          );
+
+          startDistance = currentDistance;
+        }
+      });
+
+      document.addEventListener("touchend", () => {
+        startDistance = null;
+      });
+    </script>
   </body>
 </html>
