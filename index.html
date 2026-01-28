@@ -4,7 +4,10 @@
   <meta charset="utf-8" />
   <title>Image AR – Model View</title>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no"
+  />
 
   <style>
     html, body {
@@ -20,7 +23,7 @@
       bottom: 16px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,0.6);
+      background: rgba(0,0,0,0.65);
       color: white;
       padding: 10px 14px;
       border-radius: 12px;
@@ -28,154 +31,134 @@
       z-index: 10;
       text-align: center;
     }
-
-    #debug {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      max-height: 40%;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.75);
-      color: #00ffcc;
-      font-size: 12px;
-      padding: 8px;
-      border-radius: 8px;
-      z-index: 999;
-      white-space: pre-wrap;
-      line-height: 1.4;
-    }
   </style>
 
-  <!-- Three.js -->
+  <!-- Three.js (NON-module, stable) -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/GLTFLoader.js"></script>
 
-  <!-- MindAR (NON-MODULE build – REQUIRED) -->
+  <!-- MindAR (NON-module build – REQUIRED for plain HTML) -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.min.js"></script>
 </head>
 
 <body>
-  <div id="debug"></div>
-  <div id="hint">📸 Scan the image to view in 3D</div>
+  <div id="hint">📸 Tap once, then scan the image</div>
 
   <script>
-    /* ========= DEBUG LOGGER ========= */
-    const debugBox = document.getElementById("debug");
-
-    function log(msg) {
-      console.log(msg);
-      debugBox.textContent += msg + "\n";
-      debugBox.scrollTop = debugBox.scrollHeight;
-    }
-
-    function logError(msg) {
-      console.error(msg);
-      debugBox.textContent += "❌ " + msg + "\n";
-      debugBox.scrollTop = debugBox.scrollHeight;
-    }
-
-    window.onerror = function (message, source, lineno) {
-      logError(`JS Error: ${message} (line ${lineno})`);
-    };
-
-    /* ========= AR STATE ========= */
     let model = null;
     let isPinching = false;
     let previousDistance = 0;
     let lastTouchX = null;
 
     async function startAR() {
-      log("🟢 Starting MindAR");
-
-      let mindarThree;
       try {
-        mindarThree = new MINDAR.IMAGE.MindARThree({
+        document.getElementById("hint").innerText = "🟢 Starting AR...";
+
+        // SAFETY CHECK
+        if (!window.MINDAR) {
+          document.getElementById("hint").innerText =
+            "❌ MindAR failed to load";
+          return;
+        }
+
+        console.log("🟢 MindAR library loaded");
+
+        const mindarThree = new MINDAR.IMAGE.MindARThree({
           container: document.body,
           imageTargetSrc: "targets.mind",
-          maxTrack: 1
+          maxTrack: 1,
         });
-      } catch (e) {
-        logError("MindAR failed to initialize");
-        return;
-      }
 
-      const { renderer, scene, camera } = mindarThree;
+        const { renderer, scene, camera } = mindarThree;
 
-      /* Lighting */
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.2));
-      const light = new THREE.DirectionalLight(0xffffff, 0.8);
-      light.position.set(1, 2, 1);
-      scene.add(light);
+        // LIGHTING
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.2));
+        const light = new THREE.DirectionalLight(0xffffff, 0.8);
+        light.position.set(1, 2, 1);
+        scene.add(light);
 
-      /* Anchor */
-      const anchor = mindarThree.addAnchor(0);
+        // IMAGE ANCHOR
+        const anchor = mindarThree.addAnchor(0);
 
-      /* Load Model */
-      const loader = new THREE.GLTFLoader();
-      loader.load(
-        "whistle.glb",
-        (gltf) => {
-          model = gltf.scene;
-          model.scale.set(0.3, 0.3, 0.3);
-          anchor.group.add(model);
-          log("✅ Model attached to image");
-        },
-        undefined,
-        () => logError("Failed to load whistle.glb")
-      );
+        // LOAD MODEL
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+          "whistle.glb",
+          (gltf) => {
+            model = gltf.scene;
+            model.scale.set(0.3, 0.3, 0.3);
+            anchor.group.add(model);
+            document.getElementById("hint").innerText =
+              "📸 Point camera at the image";
+            console.log("✅ Model attached to image target");
+          },
+          undefined,
+          (err) => {
+            document.getElementById("hint").innerText =
+              "❌ Model failed to load";
+            console.error(err);
+          }
+        );
 
-      try {
+        // START MINDAR (THIS TRIGGERS CAMERA PERMISSION)
         await mindarThree.start();
-        log("🟢 MindAR camera started");
-      } catch (e) {
-        logError("Camera permission denied or MindAR start failed");
-        return;
+        console.log("🟢 MindAR camera started");
+
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+        });
+
+        // ===== TOUCH CONTROLS =====
+
+        document.addEventListener("touchstart", (e) => {
+          if (!model) return;
+
+          if (e.touches.length === 2) {
+            isPinching = true;
+            previousDistance = getDistance(
+              e.touches[0],
+              e.touches[1]
+            );
+          }
+
+          if (e.touches.length === 1) {
+            lastTouchX = e.touches[0].clientX;
+          }
+        });
+
+        document.addEventListener("touchmove", (e) => {
+          if (!model) return;
+
+          // ROTATE
+          if (e.touches.length === 1 && !isPinching) {
+            const currentX = e.touches[0].clientX;
+            const deltaX = currentX - lastTouchX;
+            model.rotation.y += deltaX * 0.01;
+            lastTouchX = currentX;
+          }
+
+          // ZOOM
+          if (e.touches.length === 2) {
+            const distance = getDistance(
+              e.touches[0],
+              e.touches[1]
+            );
+            const scaleFactor = distance / previousDistance;
+            model.scale.multiplyScalar(scaleFactor);
+            previousDistance = distance;
+          }
+        });
+
+        document.addEventListener("touchend", () => {
+          isPinching = false;
+          lastTouchX = null;
+        });
+
+      } catch (err) {
+        document.getElementById("hint").innerText =
+          "❌ AR failed to start";
+        console.error("MindAR error:", err);
       }
-
-      renderer.setAnimationLoop(() => {
-        renderer.render(scene, camera);
-      });
-
-      /* ========= TOUCH CONTROLS ========= */
-
-      document.addEventListener("touchstart", (e) => {
-        if (!model) return;
-
-        if (e.touches.length === 2) {
-          isPinching = true;
-          previousDistance = getDistance(e.touches[0], e.touches[1]);
-        }
-
-        if (e.touches.length === 1) {
-          lastTouchX = e.touches[0].clientX;
-        }
-      });
-
-      document.addEventListener("touchmove", (e) => {
-        if (!model) return;
-
-        // Rotate
-        if (e.touches.length === 1 && !isPinching) {
-          const x = e.touches[0].clientX;
-          const deltaX = x - lastTouchX;
-          model.rotation.y += deltaX * 0.01;
-          lastTouchX = x;
-        }
-
-        // Zoom
-        if (e.touches.length === 2) {
-          const distance = getDistance(e.touches[0], e.touches[1]);
-          const scaleFactor = distance / previousDistance;
-          model.scale.multiplyScalar(scaleFactor);
-          previousDistance = distance;
-        }
-      });
-
-      document.addEventListener("touchend", () => {
-        isPinching = false;
-        lastTouchX = null;
-      });
     }
 
     function getDistance(t1, t2) {
@@ -184,10 +167,8 @@
       return Math.sqrt(dx * dx + dy * dy);
     }
 
-    /* Mobile browser requires user gesture */
+    // REQUIRED USER GESTURE
     document.body.addEventListener("click", startAR, { once: true });
-
-    log("📱 Ready — tap once to start AR");
   </script>
 </body>
 </html>
