@@ -2,111 +2,101 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>MindAR Camera Permission Test</title>
+  <title>Image AR</title>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      background: black;
-      font-family: monospace;
-      color: #00ffcc;
       overflow: hidden;
+      background: black;
+      font-family: sans-serif;
     }
 
-    #log {
+    #hint {
       position: fixed;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      max-height: 50%;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.8);
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 13px;
-      z-index: 9999;
-      white-space: pre-wrap;
-    }
-
-    #tap {
-      position: fixed;
-      bottom: 20px;
+      bottom: 16px;
       left: 50%;
       transform: translateX(-50%);
-      background: #00ffcc;
-      color: black;
-      padding: 14px 18px;
-      border-radius: 12px;
+      background: rgba(0,0,0,0.6);
+      color: #0f0;
+      padding: 10px 14px;
+      border-radius: 10px;
       font-size: 14px;
-      z-index: 9999;
+      z-index: 10;
+      text-align: center;
     }
   </style>
 
-  <!-- MindAR NON-module build (required for plain HTML) -->
+  <!-- Three.js (NON-module, stable) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/GLTFLoader.js"></script>
+
+  <!-- MindAR (NON-module build – REQUIRED) -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.min.js"></script>
 </head>
 
 <body>
-  <div id="log">🟡 Page loaded\n</div>
-  <div id="tap">Tap once to start AR</div>
+  <div id="hint">👆 Tap to start AR</div>
 
   <script>
-    const logBox = document.getElementById("log");
-
-    function log(msg) {
-      console.log(msg);
-      logBox.textContent += msg + "\n";
-      logBox.scrollTop = logBox.scrollHeight;
-    }
-
-    // Catch ANY JS error
-    window.onerror = function (msg, src, line, col, err) {
-      log("❌ JS ERROR: " + msg + " (line " + line + ")");
-    };
+    const hint = document.getElementById("hint");
+    let model = null;
 
     async function startAR() {
-      log("👆 User tap detected");
-
-      // Check browser support
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        log("❌ getUserMedia NOT supported");
-        return;
-      }
-      log("✅ getUserMedia supported");
-
-      // Check MindAR loaded
-      if (!window.MINDAR) {
-        log("❌ MindAR library NOT loaded");
-        return;
-      }
-      log("✅ MindAR library loaded");
-
-      let mindar;
       try {
-        mindar = new MINDAR.IMAGE.MindARThree({
+        hint.innerText = "📷 Requesting camera...";
+
+        console.log("Starting MindAR");
+
+        const mindarThree = new MINDAR.IMAGE.MindARThree({
           container: document.body,
-          imageTargetSrc: "targets.mind"
+          imageTargetSrc: "targets.mind",
+          maxTrack: 1,
         });
-        log("✅ MindAR instance created");
-      } catch (e) {
-        log("❌ Failed to create MindAR instance");
-        return;
-      }
 
-      try {
-        log("📷 Requesting CAMERA permission...");
-        await mindar.start();
-        log("🟢 CAMERA STARTED (permission granted)");
-      } catch (e) {
-        log("❌ CAMERA FAILED TO START");
-        log("👉 Possible reasons:");
-        log("• Permission blocked");
-        log("• targets.mind not found");
-        log("• Browser restriction");
-        return;
+        const { renderer, scene, camera } = mindarThree;
+
+        // Lights
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.2));
+        const light = new THREE.DirectionalLight(0xffffff, 0.8);
+        light.position.set(1, 2, 1);
+        scene.add(light);
+
+        // Anchor (image target index 0)
+        const anchor = mindarThree.addAnchor(0);
+
+        // Load model
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+          "whistle.glb",
+          (gltf) => {
+            model = gltf.scene;
+            model.scale.set(0.3, 0.3, 0.3);
+            anchor.group.add(model);
+            hint.innerText = "📸 Scan the image";
+            console.log("Model loaded");
+          },
+          undefined,
+          (err) => {
+            hint.innerText = "❌ Model load failed";
+            console.error(err);
+          }
+        );
+
+        // START CAMERA (this triggers permission popup)
+        await mindarThree.start();
+        console.log("Camera started");
+
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+        });
+
+      } catch (err) {
+        hint.innerText = "❌ MindAR failed to start";
+        console.error("MindAR error:", err);
       }
     }
 
