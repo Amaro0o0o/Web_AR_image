@@ -6,17 +6,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scan</title>
+
+  <script>
+    // ---------- GLOBAL LOGS ----------
+    console.log("🟡 Page loading...");
+
+    window.addEventListener("load", () => {
+      console.log("🟢 Window loaded");
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      console.log("🟡 Page visibility:", document.visibilityState);
+    });
+  </script>
 </head>
 
 <body>
   <a-scene
-    mindar-image="imageTargetSrc: ./targets.mind"
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true;"
     vr-mode-ui="enabled:false"
-    device-orientation-permission-ui="enabled:false">
+    device-orientation-permission-ui="enabled:true">
 
     <a-assets>
-      <!-- ✅ CORRECT MODEL -->
-      <a-asset-item id="model" src="./whistle.glb"></a-asset-item>
+      <a-asset-item
+        id="model"
+        src="./whistle.glb"
+        onload="console.log('🟢 GLB model loaded successfully')"
+        onerror="console.error('🔴 GLB model failed to load')">
+      </a-asset-item>
     </a-assets>
 
     <a-camera
@@ -24,15 +41,64 @@
       look-controls="enabled: false">
     </a-camera>
 
-    <a-entity mindar-image-target="targetIndex:0">
+    <a-entity
+      id="imageTarget"
+      mindar-image-target="targetIndex:0">
+      
       <a-gltf-model
         src="#model"
         position="0 0 0"
         rotation="0 0 0"
         scale="0.5 0.5 0.5">
       </a-gltf-model>
+
     </a-entity>
 
   </a-scene>
+
+  <script>
+    // ---------- A-FRAME + MINDAR LOGS ----------
+    const sceneEl = document.querySelector("a-scene");
+    const targetEl = document.querySelector("#imageTarget");
+
+    sceneEl.addEventListener("loaded", () => {
+      console.log("🟢 A-Scene loaded");
+    });
+
+    sceneEl.addEventListener("renderstart", () => {
+      console.log("🟢 Rendering started");
+    });
+
+    sceneEl.addEventListener("arReady", () => {
+      console.log("🟢 MindAR is ready");
+    });
+
+    sceneEl.addEventListener("arError", (err) => {
+      console.error("🔴 MindAR error:", err);
+    });
+
+    targetEl.addEventListener("targetFound", () => {
+      console.log("🟢 Image target FOUND");
+    });
+
+    targetEl.addEventListener("targetLost", () => {
+      console.log("🟡 Image target LOST");
+    });
+
+    // ---------- CAMERA PERMISSION DEBUG ----------
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      console.log("🟢 getUserMedia supported");
+
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(() => console.log("🟢 Camera permission granted"))
+        .catch(err => console.error("🔴 Camera permission denied:", err));
+    } else {
+      console.error("🔴 getUserMedia NOT supported on this device");
+    }
+
+    // ---------- DEVICE INFO ----------
+    console.log("📱 User Agent:", navigator.userAgent);
+    console.log("🌐 Protocol:", location.protocol);
+  </script>
 </body>
 </html>
