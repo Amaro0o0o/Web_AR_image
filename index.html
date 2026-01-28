@@ -100,5 +100,76 @@
     console.log("📱 User Agent:", navigator.userAgent);
     console.log("🌐 Protocol:", location.protocol);
   </script>
+  <script>
+AFRAME.registerComponent("model-controls", {
+  schema: {
+    minScale: { default: 0.2 },
+    maxScale: { default: 2 }
+  },
+
+  init() {
+    this.model = this.el;
+    this.isDragging = false;
+    this.prevX = 0;
+    this.startDist = null;
+
+    // -------- ROTATE (Mouse) --------
+    window.addEventListener("mousedown", e => {
+      this.isDragging = true;
+      this.prevX = e.clientX;
+    });
+
+    window.addEventListener("mouseup", () => {
+      this.isDragging = false;
+    });
+
+    window.addEventListener("mousemove", e => {
+      if (!this.isDragging) return;
+      const deltaX = e.clientX - this.prevX;
+      this.prevX = e.clientX;
+      this.model.object3D.rotation.y += deltaX * 0.01;
+    });
+
+    // -------- ROTATE + ZOOM (Touch) --------
+    window.addEventListener("touchstart", e => {
+      if (e.touches.length === 1) {
+        this.prevX = e.touches[0].clientX;
+      }
+
+      if (e.touches.length === 2) {
+        this.startDist = this.getDistance(e.touches);
+      }
+    });
+
+    window.addEventListener("touchmove", e => {
+      // Rotate
+      if (e.touches.length === 1) {
+        const deltaX = e.touches[0].clientX - this.prevX;
+        this.prevX = e.touches[0].clientX;
+        this.model.object3D.rotation.y += deltaX * 0.01;
+      }
+
+      // Zoom
+      if (e.touches.length === 2) {
+        const newDist = this.getDistance(e.touches);
+        const scaleChange = (newDist - this.startDist) * 0.001;
+
+        let scale = this.model.object3D.scale.x + scaleChange;
+        scale = Math.min(this.data.maxScale, Math.max(this.data.minScale, scale));
+
+        this.model.object3D.scale.set(scale, scale, scale);
+        this.startDist = newDist;
+      }
+    });
+  },
+
+  getDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+});
+</script>
+
 </body>
 </html>
